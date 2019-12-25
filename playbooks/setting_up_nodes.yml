@@ -1,0 +1,68 @@
+---
+- hosts: all
+  vars_files:
+  - env_variables
+  tasks:
+  - name: Creating a repository file for Kubernetes
+    become: true
+    become_user: root
+    file:
+     path: /etc/apt/sources.list.d/kubernetes.list #/etc/yum.repos.d/kubernetes.repo
+     state: touch
+  - name: Adding repository details in Kubernetes repo file.
+    become: true
+    become_user: root
+    blockinfile:
+     path: /etc/apt/sources.list.d/kubernetes.list
+     block: |
+      deb http://apt.kubernetes.io/ kubernetes-xenial main
+  - name: Installing Docker and firewalld
+    become: true
+    become_user: root
+    shell: |
+     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+     echo "deb http://archive.ubuntu.com/ubuntu bionic main restricted universe multiverse" >> /etc/apt/sources.list
+     echo "deb http://archive.ubuntu.com/ubuntu bionic-updates main restricted universe multiverse" >> /etc/apt/sources.list
+     echo "deb http://archive.ubuntu.com/ubuntu bionic-security main restricted universe multiverse" >> /etc/apt/sources.list
+     echo "deb http://archive.ubuntu.com/ubuntu bionic-backports main universe restricted multiverse" >> /etc/apt/sources.list
+     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+     apt update
+     apt install firewalld -y
+     apt install -y apt-utils lvm2 #device-mapper-persistent-data 
+     apt install docker.io -y
+
+  - name: Installing required packages
+    become: true
+    become_user: root
+    apt:
+     name: "{{ item }}"
+     state: present
+    with_items: "{{ packages }}"
+
+  - name: Starting and Enabling the required services
+    become: true
+    become_user: root
+    environment:
+        http_proxy: "http://192.168.100.165:8888"
+        https_proxy: "https://192.168.100.165:8888"
+    service:
+     name: "{{ item }}"
+     state: started
+     enabled: yes
+    with_items: "{{ services }}"
+
+  - name: Allow Network Ports in Firewalld
+    become: true
+    become_user: root
+    firewalld:
+     port: "{{ item }}"
+     state: enabled
+     permanent: yes
+     immediate: yes
+    with_items: "{{ ports }}"
+
+  - name: Enabling Bridge Firewall Rule
+    become: true
+    become_user: root
+    shell: "echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables"

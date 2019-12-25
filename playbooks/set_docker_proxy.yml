@@ -1,0 +1,38 @@
+---
+- hosts: all
+  vars_files:
+  - env_variables
+  tasks:
+  - name: Creating a directory for docker service
+    become: true
+    become_user: root
+    shell:
+     mkdir -p /etc/systemd/system/docker.service.d
+  - name: Creating a file for docker service
+    become: true
+    become_user: root
+    shell:
+     touch /etc/systemd/system/docker.service.d/proxy.conf
+  - name: Adding proxy detail in proxy.conf file
+    become: true
+    become_user: root
+    blockinfile:
+     path: /etc/systemd/system/docker.service.d/proxy.conf
+     marker: "#------"
+     state: present
+     block: |
+       [Service]
+       Environment="HTTP_PROXY=http://192.168.100.165:8888"
+       Environment="HTTPS_PROXY=http://192.168.100.165:8888"
+       Environment="NO_PROXY="localhost,127.0.0.1,::1"
+  - name: Daemon reload
+    become: true
+    become_user: root
+    shell:
+     systemctl daemon-reload
+  - name: Docker Restart
+    become: true
+    become_user: root
+    shell:
+     systemctl restart docker.service
+

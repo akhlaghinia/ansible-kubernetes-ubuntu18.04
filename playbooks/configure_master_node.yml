@@ -1,0 +1,46 @@
+---
+- hosts: kubernetes-master-nodes
+  vars_files:
+  - env_variables
+  tasks:
+  - name: Pulling images required for setting up a Kubernetes cluster
+    # environment:
+    shell: 
+     export http_proxy="http://192.168.100.165:8888"
+     export https_proxy="http://192.168.100.165:8888"
+     kubeadm config images pull
+
+  - name: Resetting kubeadm
+    become: true
+    become_user: root
+    shell: kubeadm reset -f
+    register: output
+
+  - name: Initializing Kubernetes cluster
+    become: true
+    become_user: root
+    shell: kubeadm init  --pod-network-cidr={{ cidr_v }} --apiserver-advertise-address={{ ad_addr }}
+    register: output
+
+  - name: Storing Logs and Generated token for future purpose.
+    become: true
+    become_user: root
+    local_action: copy content={{ output.stdout }} dest=/home/tplan/{{ token_file }}
+
+  - name: Copying required files
+    become: true
+    become_user: root
+    shell: |
+     mkdir -p $HOME/.kube
+     sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config
+     sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+  - name: Install Network Add-on
+    become: true
+    become_user: root
+    command: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+  
+  - name: Install Dashboard
+    become: true
+    become_user: root
+    command: kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0-beta8/aio/deploy/recommended.yaml
